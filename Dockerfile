@@ -10,7 +10,6 @@ FROM --platform=linux/amd64 alpine:latest
 WORKDIR /app
 COPY --from=builder /app/bot .
 COPY --from=builder /app/imgs ./imgs
-COPY --from=builder /app/.env .
 
 RUN chmod +x /app/bot
 CMD ["/app/bot"] 
