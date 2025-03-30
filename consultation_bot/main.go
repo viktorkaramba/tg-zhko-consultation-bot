@@ -205,7 +205,7 @@ func main() {
 		log.Fatalf("error opening .env file: %v", err)
 	}
 
-	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_BOT_TOKEN"))
+	bot, err := tgbotapi.NewBotAPI(os.Getenv("CONSULTATION_BOT_TOKEN"))
 	if err != nil {
 		log.Panic(err)
 	}
