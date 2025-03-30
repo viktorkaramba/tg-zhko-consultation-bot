@@ -216,8 +216,9 @@ func main() {
 					forwardText += "\n\nВідправник: "
 					if update.Message.From.UserName != "" {
 						forwardText += "@" + update.Message.From.UserName
-					} else {
-						forwardText += update.Message.From.FirstName
+						if update.Message.From.FirstName != "" {
+							forwardText += ", " + update.Message.From.FirstName
+						}
 						if update.Message.From.LastName != "" {
 							forwardText += " " + update.Message.From.LastName
 						}
