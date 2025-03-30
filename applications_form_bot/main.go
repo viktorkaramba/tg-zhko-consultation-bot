@@ -144,7 +144,7 @@ func main() {
 
 	// Start HTTP server for Cloud Run
 	go func() {
-		port := os.Getenv("LOCAL_PORT")
+		port := os.Getenv("APPLICATIONS_FORM_BOT_PORT")
 		if port == "" {
 			port = "8080"
 		}
