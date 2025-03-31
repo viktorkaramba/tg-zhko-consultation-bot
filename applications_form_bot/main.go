@@ -25,11 +25,11 @@ const (
 Цей бот допоможе Вам і нам поліпшити комунікацію щодо надання послуг з управління багатоквартирними будинками. 
 
 ВАЖЛИВО❗️
-Якщо сталася аварійна ситуація негайно телефонуйте за номером: 0 800 213 775      
+Якщо сталася аварійна ситуація, негайно телефонуйте за номером: 0 800 213 775      
 
 Будь ласка, оберіть опцію, яка Вас цікавить👇`
 
-	requestInfoText = `Для обробки вашої заявки, будь ласка, надайте наступну інформацію:
+	requestInfoText = `Для обробки Вашої заявки, будь ласка, надайте наступну інформацію:
 - ПІБ
 - Вулиця
 - № будинку
@@ -39,12 +39,18 @@ const (
 
 Введіть всю інформацію в одному повідомленні.`
 
+	feedbackInfoText = `Залиште, будь ласка, свій відгук та контакти для зворотнього звʼязку у повідомленні`
+
+	otherInfoText = `Опишіть Вашу пропозицію та залишіть контакт для зворотнього звʼязку`
+
 	followUpText = `Якщо маєте пропозиції чи зауваження щодо якості надання послуг, можна також зателефонувати за номером 067 895 34 99, щоб ми могли врахувати та вчасно зреагувати.
 
 Якщо і після звернення у Вас залишились зауваження чи пропозиції, зателефонуйте нашому керівнику за номером 098 464 68 63`
 )
 
-var groupID int64
+var groupID = int64(-1002546642948)
+
+// var groupID = int64(-4672540477)
 
 // User state tracking
 var userStates = make(map[int64]string)
@@ -63,6 +69,32 @@ var botGroups = struct {
 	sync.RWMutex
 	groups map[int64]GroupInfo
 }{groups: make(map[int64]GroupInfo)}
+
+// Handles a button click by setting user state and sending appropriate info text
+func handleButtonClick(bot *tgbotapi.BotAPI, userID int64, buttonText string) error {
+	// Update the state with the selected button
+	userStates[userID] = buttonText
+
+	// Create message with appropriate text based on button type
+	msg := tgbotapi.NewMessage(userID, "")
+
+	// Use switch instead of if-else for better readability
+	switch buttonText {
+	case feedbackButton:
+		msg.Text = feedbackInfoText
+	case otherButton:
+		msg.Text = otherInfoText
+	default:
+		msg.Text = requestInfoText
+	}
+
+	// Send the message
+	_, err := bot.Send(msg)
+	if err != nil {
+		log.Printf("Error sending button response message: %v", err)
+	}
+	return err
+}
 
 // Add a group to the tracking list
 func trackGroup(chat *tgbotapi.Chat) {
@@ -203,6 +235,16 @@ func main() {
 				continue
 			}
 
+			// Check if user clicked another button while having a state
+			switch update.Message.Text {
+			case sewageButton, lightButton, plumbingButton, roofButton, otherButton, feedbackButton:
+				// Handle button click using helper method
+				if err := handleButtonClick(bot, userID, update.Message.Text); err != nil {
+					log.Printf("Error handling button click: %v", err)
+				}
+				continue
+			}
+
 			// User is submitting request details
 			// Forward message to admin if username is available
 			if groupID != 0 {
@@ -245,17 +287,20 @@ func main() {
 		// Handle button clicks to set user state
 		switch update.Message.Text {
 		case sewageButton, lightButton, plumbingButton, roofButton, otherButton, feedbackButton:
-			// Skip menu button handling in group chats
+			// Skip menu button handling and message sending in group chats
 			if update.Message.Chat.Type == "group" || update.Message.Chat.Type == "supergroup" {
+				log.Printf("Ignoring button click in group chat: %s", update.Message.Chat.Title)
 				continue
 			}
 
-			// Store what type of request the user is making
-			userStates[userID] = update.Message.Text
+			// Skip if user already has a state (handled above)
+			if _, exists := userStates[userID]; exists {
+				continue
+			}
 
-			msg.Text = requestInfoText
-			if _, err := bot.Send(msg); err != nil {
-				log.Printf("Error sending request info message: %v", err)
+			// Handle button click using helper method
+			if err := handleButtonClick(bot, userID, update.Message.Text); err != nil {
+				log.Printf("Error handling button click: %v", err)
 			}
 			continue
 		default:
