@@ -17,10 +17,18 @@ const (
 	welcomeMessage     = `Вітаю! На зв'язку юрисконсульт КП НМР "ЖКО"👋🏻
 Цей бот допоможе Вам розібратися з питаннями, які виникають при написанні заяви про перерахунок плати за послугу з вивезення побутових відходів у зв'язку з перебуванням за кордоном📃
 Будь ласка, уточніть, яке питання Вас цікавить?👇`
-	welcomeImagePath     = "imgs/welcome.JPEG"
-	aboutImagePath       = "imgs/about.JPEG"
-	instructionImagePath = "imgs/instruction.JPEG" // Add your instruction image here
-	aboutText            = `1. Відповідно до Закону України «Про житлово-комунальні послуги» (пп. 6 п. 1 ст. 7), споживач звільняється від оплати комунальних послуг у разі їх невикористання під час тимчасової відсутності в житловому приміщенні понад 30 днів. Для цього необхідно надати документальне підтвердження. 
+	welcomeImagePath     = "consultation_bot/imgs/welcome.JPEG"
+	aboutImagePath       = "consultation_bot/imgs/about.JPEG"
+	instructionImagePath = "consultation_bot/imgs/instruction.JPEG" // Add your instruction image here
+	// Green waste request support
+	greenWasteButton = "5. Подати заявку на вивезення відходів зелених насаджень"
+	greenWastePrompt = `Для обробки Вашої заявки, будь ласка, надайте наступну інформацію (в одному повідомленні):
+Адреса 
+Які саме відходи (скошена трава, опале листя, зрізане гілля, тощо)
+Об'єм у метрах кубічних
+Контактний номер телефону`
+	greenWasteAlert = `Звертаємо увагу, що облік відходів здійснюється  у метрах кубічних, подрібнені та спресовані відходи займуть менший об'єм`
+	aboutText       = `1. Відповідно до Закону України «Про житлово-комунальні послуги» (пп. 6 п. 1 ст. 7), споживач звільняється від оплати комунальних послуг у разі їх невикористання під час тимчасової відсутності в житловому приміщенні понад 30 днів. Для цього необхідно надати документальне підтвердження. 
 📌Тобто, якщо ви не проживаєте у своєму помешканні більше ніж 30 днів, ви маєте право не сплачувати за вивезення сміття. Тимчасова відсутність - це до 6-и місяців`
 	instructionText = `Спершу, важливі нюанси:
 📍Заяву необхідно оформляти окремо для кожної особи.
@@ -99,6 +107,14 @@ const (
 
 var consultationText = `Для отримання особистої консультації зверніться до юрисконсультанта - @bulliia, та опишіть їй своє питання.`
 
+// Track simple state for green waste request flow
+var userStates = make(map[int64]string)
+
+// Group ID to forward requests to (same group as applications_form_bot)
+var groupID = int64(-1002546642948)
+
+// var groupID = int64(-1002645048203)
+
 func getMainKeyboard() tgbotapi.ReplyKeyboardMarkup {
 	keyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
@@ -112,6 +128,9 @@ func getMainKeyboard() tgbotapi.ReplyKeyboardMarkup {
 		),
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(otherCasesButton),
+		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(greenWasteButton),
 		),
 	)
 	keyboard.ResizeKeyboard = true
@@ -245,6 +264,10 @@ func main() {
 
 		// Handle callback queries first
 		if update.CallbackQuery != nil {
+			// Ignore callback queries from group chats
+			if update.CallbackQuery.Message != nil && (update.CallbackQuery.Message.Chat.Type == "group" || update.CallbackQuery.Message.Chat.Type == "supergroup") {
+				continue
+			}
 			log.Printf("Processing callback query: %s", update.CallbackQuery.Data)
 
 			// Answer the callback query first
@@ -279,7 +302,44 @@ func main() {
 			continue
 		}
 
+		// Ignore any messages from group or supergroup chats
+		if update.Message.Chat != nil && (update.Message.Chat.Type == "group" || update.Message.Chat.Type == "supergroup") {
+			continue
+		}
+
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
+
+		// If awaiting details for green waste request, forward the input to the group
+		if state, ok := userStates[update.Message.Chat.ID]; ok && state == greenWasteButton {
+			if groupID != 0 {
+				forwardText := "Нова заявка на вивезення відходів зелених насаджень:\n\n"
+				forwardText += "Деталі заявки:\n" + update.Message.Text
+				if update.Message.From != nil {
+					forwardText += "\n\nВідправник: "
+					if update.Message.From.UserName != "" {
+						forwardText += "@" + update.Message.From.UserName
+						if update.Message.From.FirstName != "" {
+							forwardText += ", " + update.Message.From.FirstName
+						}
+						if update.Message.From.LastName != "" {
+							forwardText += " " + update.Message.From.LastName
+						}
+					}
+				}
+				adminMsg := tgbotapi.NewMessage(groupID, forwardText)
+				if _, err := bot.Send(adminMsg); err != nil {
+					log.Printf("Error forwarding green waste request to group: %v", err)
+				}
+			}
+
+			delete(userStates, update.Message.Chat.ID)
+			msg.Text = "Дякуємо! Вашу заявку надіслано. Ми зв'яжемося за вказаним номером."
+			msg.ReplyMarkup = getMainKeyboard()
+			if _, err := bot.Send(msg); err != nil {
+				log.Printf("Error sending confirmation message: %v", err)
+			}
+			continue
+		}
 
 		// Show keyboard for /start command
 		if update.Message.IsCommand() && update.Message.Command() == "start" {
@@ -295,6 +355,14 @@ func main() {
 
 		// Handle button clicks
 		switch update.Message.Text {
+		case greenWasteButton:
+			userStates[update.Message.Chat.ID] = greenWasteButton
+			msg.Text = greenWastePrompt + "\n\n" + greenWasteAlert
+			msg.ReplyMarkup = getMainKeyboard()
+			if _, err := bot.Send(msg); err != nil {
+				log.Printf("Error sending green waste prompt: %v", err)
+			}
+			continue
 		case aboutButton:
 			photo := tgbotapi.NewPhoto(update.Message.Chat.ID, tgbotapi.FilePath(aboutImagePath))
 			photo.Caption = aboutText
