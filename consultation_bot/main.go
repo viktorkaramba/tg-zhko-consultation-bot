@@ -17,9 +17,9 @@ const (
 	welcomeMessage     = `Вітаю! На зв'язку юрисконсульт КП НМР "ЖКО"👋🏻
 Цей бот допоможе Вам розібратися з питаннями, які виникають при написанні заяви про перерахунок плати за послугу з вивезення побутових відходів у зв'язку з перебуванням за кордоном📃
 Будь ласка, уточніть, яке питання Вас цікавить?👇`
-	welcomeImagePath     = "consultation_bot/imgs/welcome.JPEG"
-	aboutImagePath       = "consultation_bot/imgs/about.JPEG"
-	instructionImagePath = "consultation_bot/imgs/instruction.JPEG" // Add your instruction image here
+	welcomeImagePath     = "imgs/welcome.JPEG"
+	aboutImagePath       = "imgs/about.JPEG"
+	instructionImagePath = "imgs/instruction.JPEG" // Add your instruction image here
 	// Green waste request support
 	greenWasteButton = "5. Подати заявку на вивезення відходів зелених насаджень"
 	greenWastePrompt = `Для обробки Вашої заявки, будь ласка, надайте наступну інформацію (в одному повідомленні):
